@@ -28,40 +28,39 @@ def get_probability(database, event, conditions=[]):
 def train(database):
   p_cancer = get_probability(database, [(9, 1)])
   p_conditionals = {}
-  p_values = {}
 
   for attr in range(9):
     p_conditionals[attr] = {}
-    p_values[attr] = {}
   
     for value in range(1, 11):
-      p_conditionals[attr][value] = get_probability(database, [(attr, value)], conditions=[(9, 1)])
-      p_values[attr][value] = get_probability(database, [(attr, value)])
+      p_positive = get_probability(database, [(attr, value)], conditions=[(9, 1)])
+      p_negative = get_probability(database, [(attr, value)], conditions=[(9, 0)])
+      p_conditionals[attr][value] = (p_positive, p_negative)
 
-  return p_cancer, p_conditionals, p_values
+  return p_cancer, p_conditionals
 
-def predict(case, p_cancer, p_conditionals, p_values):
-  probability = p_cancer
+def predict(case, p_cancer, p_conditionals):
+  positive = p_cancer
   
   for attr in range(9):
-    probability *= p_conditionals[attr][case[attr]]
+    positive *= p_conditionals[attr][case[attr]][0]
   
-  p_effect = 1.0
+  negative = (1.0 - p_cancer)
   for attr in range(9):
-    p_effect *= (1.0 / 10) if p_values[attr][case[attr]] == 0 else p_values[attr][case[attr]]
+    negative *= p_conditionals[attr][case[attr]][1]
   
-  return probability / p_effect
+  return positive / (positive + negative)
 
 def main():
   database = read_database("wdbc.data")
   training_db = database[0: int(0.8 * len(database))]
 
-  p_cancer, p_conditionals, p_values = train(training_db)
+  p_cancer, p_conditionals = train(training_db)
 
   # Evaluate precision of model
   successes = 0
   for case in database:
-    probability = predict(case, p_cancer, p_conditionals, p_values)
+    probability = predict(case, p_cancer, p_conditionals)
     
     if probability > 0.5 and case[9] == 1:
       successes += 1
